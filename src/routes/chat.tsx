@@ -212,7 +212,10 @@ function ChatScreen() {
             </div>
           </header>
 
-          <div ref={scrollRef} className="flex flex-1 flex-col gap-8 overflow-y-auto p-6">
+          <div
+            ref={scrollRef}
+            className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 sm:gap-8 sm:p-6"
+          >
             {messages.map((m, i) =>
               m.role === "assistant" ? (
                 <div key={i} className="flex max-w-[80%] flex-col gap-2">
