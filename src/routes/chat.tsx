@@ -186,25 +186,25 @@ function ChatScreen() {
   const capturedCount = state.captured.length;
 
   return (
-    <main className="min-h-screen bg-zinc-100 px-6 py-12 md:py-20">
+    <main className="min-h-screen bg-zinc-100 px-3 py-6 sm:px-6 sm:py-12 md:py-20">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        <div className="flex h-[700px] flex-col overflow-hidden rounded-[24px] bg-white shadow-sm ring-1 ring-zinc-950/5">
-          <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-950/5 bg-white px-6 py-4">
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-full bg-clinical-teal/10 font-medium text-clinical-teal">
+        <div className="flex h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-950/5 sm:h-[700px] sm:rounded-[24px]">
+          <header className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-zinc-950/5 bg-white px-4 py-3 sm:flex sm:justify-between sm:px-6 sm:py-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-clinical-teal/10 font-medium text-clinical-teal">
                 AI
               </span>
-              <div>
-                <p className="text-sm font-semibold text-zinc-900">{t.assistantName}</p>
-                <p className="text-xs text-zinc-500">{t.assistantSubtitle}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-zinc-900">{t.assistantName}</p>
+                <p className="truncate text-xs text-zinc-500">{t.assistantSubtitle}</p>
               </div>
             </div>
-            <div className="hidden gap-1 sm:flex">
+            <div className="flex shrink-0 gap-1">
               {KEYS.map((k) => (
                 <span
                   key={k}
                   title={SOCRATES_LABELS[k]}
-                  className={`h-1.5 w-6 rounded-full ${
+                  className={`h-1.5 w-3 rounded-full sm:w-6 ${
                     state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
                   }`}
                 />
@@ -212,7 +212,10 @@ function ChatScreen() {
             </div>
           </header>
 
-          <div ref={scrollRef} className="flex flex-1 flex-col gap-8 overflow-y-auto p-6">
+          <div
+            ref={scrollRef}
+            className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 sm:gap-8 sm:p-6"
+          >
             {messages.map((m, i) =>
               m.role === "assistant" ? (
                 <div key={i} className="flex max-w-[80%] flex-col gap-2">
@@ -278,12 +281,12 @@ function ChatScreen() {
             )}
           </div>
 
-          <footer className="border-t border-zinc-950/5 bg-white p-4">
-            <div className="flex items-center gap-2 rounded-xl bg-zinc-50 p-2 ring-1 ring-zinc-950/10">
+          <footer className="border-t border-zinc-950/5 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+            <div className="flex items-center gap-1 rounded-xl bg-zinc-50 p-1.5 ring-1 ring-zinc-950/10 sm:gap-2 sm:p-2">
               <button
                 onClick={upload}
                 aria-label={t.uploadLabel}
-                className="flex min-h-11 min-w-11 items-center gap-2 p-2 text-zinc-500 transition-colors hover:text-zinc-700"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 p-2 text-zinc-500 transition-colors hover:text-zinc-700"
               >
                 {uploading ? (
                   <Loader2 className="size-5 animate-spin" strokeWidth={1.5} />
@@ -305,7 +308,7 @@ function ChatScreen() {
                 }}
                 type="text"
                 placeholder={t.inputPlaceholder}
-                className="min-h-11 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
+                className="min-h-11 w-full min-w-0 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
               />
               <button
                 onClick={toggleVoice}
@@ -313,7 +316,7 @@ function ChatScreen() {
                 title={speech.supported ? undefined : speechLabels.unsupported}
                 aria-label={speech.listening ? speechLabels.stop : speechLabels.start}
                 aria-pressed={speech.listening}
-                className={`min-h-11 min-w-11 rounded-lg p-2 transition-colors disabled:opacity-40 ${
+                className={`min-h-11 min-w-11 shrink-0 rounded-lg p-2 transition-colors disabled:opacity-40 ${
                   speech.listening
                     ? "animate-pulse bg-red-500 text-white"
                     : "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
@@ -329,7 +332,7 @@ function ChatScreen() {
                 onClick={() => void submit()}
                 disabled={busy || !draft.trim()}
                 aria-label={t.sendLabel}
-                className="min-h-11 min-w-11 rounded-lg bg-clinical-teal p-2 text-primary-foreground disabled:opacity-40"
+                className="min-h-11 min-w-11 shrink-0 rounded-lg bg-clinical-teal p-2 text-primary-foreground disabled:opacity-40"
               >
                 <Send className="mx-auto size-4" strokeWidth={1.5} />
               </button>
