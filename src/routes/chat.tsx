@@ -97,6 +97,24 @@ function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const baseDraftRef = useRef("");
+
+  const speech = useSpeechRecognition({
+    language: state.language,
+    onTranscript: (text, isFinal) => {
+      const base = baseDraftRef.current;
+      const joined = base ? `${base.replace(/\s+$/, "")} ${text}` : text;
+      setDraft(joined);
+      if (isFinal) baseDraftRef.current = joined;
+    },
+  });
+
+  const speechLabels = SPEECH_LABELS[state.language] ?? SPEECH_LABELS["English"]!;
+
+  const toggleVoice = () => {
+    if (!speech.listening) baseDraftRef.current = draft;
+    speech.toggle();
+  };
 
   const messages = effectiveMessages(state);
 
