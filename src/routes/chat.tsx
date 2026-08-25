@@ -1,7 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { FileText, Loader as Loader2, Plus, Send, ArrowRight, AlertTriangle } from "lucide-react";
+import {
+  FileText,
+  Loader as Loader2,
+  Plus,
+  Send,
+  ArrowRight,
+  AlertTriangle,
+  Mic,
+  MicOff,
+} from "lucide-react";
+import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
 import { intakeTurn } from "@/lib/intake.functions";
 import {
   MOCK_EXTRACTION,
