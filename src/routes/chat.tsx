@@ -334,6 +334,13 @@ function ChatScreen() {
                 <Send className="mx-auto size-4" strokeWidth={1.5} />
               </button>
             </div>
+            {(speech.listening || speech.error) && (
+              <p
+                className={`px-2 pt-2 text-xs ${speech.error ? "text-destructive" : "text-zinc-500"}`}
+              >
+                {speech.error ?? speechLabels.stop}
+              </p>
+            )}
           </footer>
         </div>
 
