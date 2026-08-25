@@ -296,7 +296,10 @@ function ChatScreen() {
               </button>
               <input
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  baseDraftRef.current = e.target.value;
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void submit();
                 }}
@@ -304,6 +307,24 @@ function ChatScreen() {
                 placeholder={t.inputPlaceholder}
                 className="min-h-11 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
               />
+              <button
+                onClick={toggleVoice}
+                disabled={!speech.supported}
+                title={speech.supported ? undefined : speechLabels.unsupported}
+                aria-label={speech.listening ? speechLabels.stop : speechLabels.start}
+                aria-pressed={speech.listening}
+                className={`min-h-11 min-w-11 rounded-lg p-2 transition-colors disabled:opacity-40 ${
+                  speech.listening
+                    ? "animate-pulse bg-red-500 text-white"
+                    : "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+                }`}
+              >
+                {speech.supported ? (
+                  <Mic className="mx-auto size-5" strokeWidth={1.5} />
+                ) : (
+                  <MicOff className="mx-auto size-5" strokeWidth={1.5} />
+                )}
+              </button>
               <button
                 onClick={() => void submit()}
                 disabled={busy || !draft.trim()}
