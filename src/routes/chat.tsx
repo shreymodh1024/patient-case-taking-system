@@ -278,12 +278,12 @@ function ChatScreen() {
             )}
           </div>
 
-          <footer className="border-t border-zinc-950/5 bg-white p-4">
-            <div className="flex items-center gap-2 rounded-xl bg-zinc-50 p-2 ring-1 ring-zinc-950/10">
+          <footer className="border-t border-zinc-950/5 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+            <div className="flex items-center gap-1 rounded-xl bg-zinc-50 p-1.5 ring-1 ring-zinc-950/10 sm:gap-2 sm:p-2">
               <button
                 onClick={upload}
                 aria-label={t.uploadLabel}
-                className="flex min-h-11 min-w-11 items-center gap-2 p-2 text-zinc-500 transition-colors hover:text-zinc-700"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 p-2 text-zinc-500 transition-colors hover:text-zinc-700"
               >
                 {uploading ? (
                   <Loader2 className="size-5 animate-spin" strokeWidth={1.5} />
