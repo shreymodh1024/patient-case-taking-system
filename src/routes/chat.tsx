@@ -313,7 +313,7 @@ function ChatScreen() {
                 title={speech.supported ? undefined : speechLabels.unsupported}
                 aria-label={speech.listening ? speechLabels.stop : speechLabels.start}
                 aria-pressed={speech.listening}
-                className={`min-h-11 min-w-11 rounded-lg p-2 transition-colors disabled:opacity-40 ${
+                className={`min-h-11 min-w-11 shrink-0 rounded-lg p-2 transition-colors disabled:opacity-40 ${
                   speech.listening
                     ? "animate-pulse bg-red-500 text-white"
                     : "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
