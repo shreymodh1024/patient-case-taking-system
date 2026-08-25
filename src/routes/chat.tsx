@@ -186,10 +186,10 @@ function ChatScreen() {
   const capturedCount = state.captured.length;
 
   return (
-    <main className="min-h-screen bg-zinc-100 px-6 py-12 md:py-20">
+    <main className="min-h-screen bg-zinc-100 px-3 py-6 sm:px-6 sm:py-12 md:py-20">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        <div className="flex h-[700px] flex-col overflow-hidden rounded-[24px] bg-white shadow-sm ring-1 ring-zinc-950/5">
-          <header className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-950/5 bg-white px-6 py-4">
+        <div className="flex h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-950/5 sm:h-[700px] sm:rounded-[24px]">
+          <header className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-zinc-950/5 bg-white px-4 py-3 sm:flex sm:justify-between sm:px-6 sm:py-4">
             <div className="flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-full bg-clinical-teal/10 font-medium text-clinical-teal">
                 AI
