@@ -190,21 +190,21 @@ function ChatScreen() {
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
         <div className="flex h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-950/5 sm:h-[700px] sm:rounded-[24px]">
           <header className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-zinc-950/5 bg-white px-4 py-3 sm:flex sm:justify-between sm:px-6 sm:py-4">
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-full bg-clinical-teal/10 font-medium text-clinical-teal">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-clinical-teal/10 font-medium text-clinical-teal">
                 AI
               </span>
-              <div>
-                <p className="text-sm font-semibold text-zinc-900">{t.assistantName}</p>
-                <p className="text-xs text-zinc-500">{t.assistantSubtitle}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-zinc-900">{t.assistantName}</p>
+                <p className="truncate text-xs text-zinc-500">{t.assistantSubtitle}</p>
               </div>
             </div>
-            <div className="hidden gap-1 sm:flex">
+            <div className="flex shrink-0 gap-1">
               {KEYS.map((k) => (
                 <span
                   key={k}
                   title={SOCRATES_LABELS[k]}
-                  className={`h-1.5 w-6 rounded-full ${
+                  className={`h-1.5 w-3 rounded-full sm:w-6 ${
                     state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
                   }`}
                 />
