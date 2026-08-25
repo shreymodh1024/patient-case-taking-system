@@ -127,6 +127,8 @@ function ChatScreen() {
     if (!text || busy) return;
     setError(null);
     setDraft("");
+    baseDraftRef.current = "";
+    if (speech.listening) speech.stop();
     const history = [
       ...state.messages,
       { role: "patient" as const, content: text, time: nowLabel() },
