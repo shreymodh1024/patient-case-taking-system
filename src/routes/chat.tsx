@@ -329,7 +329,7 @@ function ChatScreen() {
                 onClick={() => void submit()}
                 disabled={busy || !draft.trim()}
                 aria-label={t.sendLabel}
-                className="min-h-11 min-w-11 rounded-lg bg-clinical-teal p-2 text-primary-foreground disabled:opacity-40"
+                className="min-h-11 min-w-11 shrink-0 rounded-lg bg-clinical-teal p-2 text-primary-foreground disabled:opacity-40"
               >
                 <Send className="mx-auto size-4" strokeWidth={1.5} />
               </button>
