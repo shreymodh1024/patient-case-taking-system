@@ -305,7 +305,7 @@ function ChatScreen() {
                 }}
                 type="text"
                 placeholder={t.inputPlaceholder}
-                className="min-h-11 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
+                className="min-h-11 w-full min-w-0 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
               />
               <button
                 onClick={toggleVoice}
