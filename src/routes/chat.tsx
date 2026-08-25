@@ -1,7 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { FileText, Loader as Loader2, Plus, Send, ArrowRight, AlertTriangle } from "lucide-react";
+import {
+  FileText,
+  Loader as Loader2,
+  Plus,
+  Send,
+  ArrowRight,
+  AlertTriangle,
+  Mic,
+  MicOff,
+} from "lucide-react";
+import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
 import { intakeTurn } from "@/lib/intake.functions";
 import {
   MOCK_EXTRACTION,
@@ -87,6 +97,24 @@ function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const baseDraftRef = useRef("");
+
+  const speech = useSpeechRecognition({
+    language: state.language,
+    onTranscript: (text, isFinal) => {
+      const base = baseDraftRef.current;
+      const joined = base ? `${base.replace(/\s+$/, "")} ${text}` : text;
+      setDraft(joined);
+      if (isFinal) baseDraftRef.current = joined;
+    },
+  });
+
+  const speechLabels = SPEECH_LABELS[state.language] ?? SPEECH_LABELS["English"]!;
+
+  const toggleVoice = () => {
+    if (!speech.listening) baseDraftRef.current = draft;
+    speech.toggle();
+  };
 
   const messages = effectiveMessages(state);
 
@@ -99,6 +127,8 @@ function ChatScreen() {
     if (!text || busy) return;
     setError(null);
     setDraft("");
+    baseDraftRef.current = "";
+    if (speech.listening) speech.stop();
     const history = [
       ...state.messages,
       { role: "patient" as const, content: text, time: nowLabel() },
@@ -266,7 +296,10 @@ function ChatScreen() {
               </button>
               <input
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  baseDraftRef.current = e.target.value;
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void submit();
                 }}
@@ -274,6 +307,24 @@ function ChatScreen() {
                 placeholder={t.inputPlaceholder}
                 className="min-h-11 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
               />
+              <button
+                onClick={toggleVoice}
+                disabled={!speech.supported}
+                title={speech.supported ? undefined : speechLabels.unsupported}
+                aria-label={speech.listening ? speechLabels.stop : speechLabels.start}
+                aria-pressed={speech.listening}
+                className={`min-h-11 min-w-11 rounded-lg p-2 transition-colors disabled:opacity-40 ${
+                  speech.listening
+                    ? "animate-pulse bg-red-500 text-white"
+                    : "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+                }`}
+              >
+                {speech.supported ? (
+                  <Mic className="mx-auto size-5" strokeWidth={1.5} />
+                ) : (
+                  <MicOff className="mx-auto size-5" strokeWidth={1.5} />
+                )}
+              </button>
               <button
                 onClick={() => void submit()}
                 disabled={busy || !draft.trim()}
@@ -283,6 +334,13 @@ function ChatScreen() {
                 <Send className="mx-auto size-4" strokeWidth={1.5} />
               </button>
             </div>
+            {(speech.listening || speech.error) && (
+              <p
+                className={`px-2 pt-2 text-xs ${speech.error ? "text-destructive" : "text-zinc-500"}`}
+              >
+                {speech.error ?? speechLabels.stop}
+              </p>
+            )}
           </footer>
         </div>
 
