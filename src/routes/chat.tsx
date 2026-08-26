@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
 import { intakeTurn } from "@/lib/intake.functions";
+import { scanReport } from "@/lib/ocr.functions";
 import {
-  MOCK_EXTRACTION,
   SOCRATES_LABELS,
   nowLabel,
   setKioskState,
@@ -97,6 +97,7 @@ function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const baseDraftRef = useRef("");
 
   const speech = useSpeechRecognition({
@@ -146,7 +147,7 @@ function ChatScreen() {
           language: state.language,
           ayushMode: state.ayushMode,
           extractedNote: state.extracted
-            ? `${state.extracted.fileName}: ${state.extracted.fields
+            ? `${state.extracted.fileName}: ${state.extracted.ocrSummary ?? ""} ${state.extracted.fields
                 .map((f) => `${f.label} ${f.value}`)
                 .join(", ")}`
             : null,
@@ -176,11 +177,37 @@ function ChatScreen() {
 
   const upload = () => {
     if (uploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFile = async (file: File) => {
+    setError(null);
     setUploading(true);
-    window.setTimeout(() => {
-      setKioskState({ extracted: MOCK_EXTRACTION });
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Could not read the file."));
+        reader.readAsDataURL(file);
+      });
+      const base64Data = dataUrl.split(",")[1] ?? "";
+      const mimeType = file.type || "application/octet-stream";
+      const result = await scanReport({
+        data: { fileName: file.name, mimeType, base64Data, language: state.language },
+      });
+      setKioskState({
+        extracted: {
+          fileName: result.fileName,
+          fields: result.fields,
+          ocrSummary: result.summaryText,
+        },
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.genericError);
+    } finally {
       setUploading(false);
-    }, 1400);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const capturedCount = state.captured.length;
@@ -265,6 +292,11 @@ function ChatScreen() {
                     {state.extracted.fileName} · {t.extractionComplete}
                   </span>
                 </div>
+                {state.extracted.ocrSummary && (
+                  <p className="text-pretty text-sm leading-relaxed text-zinc-700">
+                    {state.extracted.ocrSummary}
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   {state.extracted.fields.map((f) => (
                     <div key={f.label} className="space-y-1">
@@ -282,6 +314,16 @@ function ChatScreen() {
           </div>
 
           <footer className="border-t border-zinc-950/5 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,image/jpeg,image/png,image/webp,image/heic,image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleFile(file);
+              }}
+            />
             <div className="flex items-center gap-1 rounded-xl bg-zinc-50 p-1.5 ring-1 ring-zinc-950/10 sm:gap-2 sm:p-2">
               <button
                 onClick={upload}
