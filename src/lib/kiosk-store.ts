@@ -12,6 +12,7 @@ export type ChatMessage = {
 export type ExtractedDoc = {
   fileName: string;
   fields: { label: string; value: string }[];
+  ocrSummary?: string;
 };
 
 export type SocratesKey =
