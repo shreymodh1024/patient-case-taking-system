@@ -1,18 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import { scanMedicalReport } from "./ocr.server";
+import { parseScanReportInput, scanMedicalReport, type OcrReportSummary } from "./ocr.server";
 
-const MAX_BASE64_LENGTH = 7_000_000; // ~5MB file
-
-const InputSchema = z.object({
-  fileName: z.string().min(1).max(200),
-  mimeType: z.string().min(1).max(100),
-  base64Data: z.string().min(1).max(MAX_BASE64_LENGTH),
-  language: z.string().default("English"),
-});
+export type ScanReportResult =
+  | { ok: true; report: OcrReportSummary }
+  | { ok: false; error: string };
 
 export const scanReport = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => InputSchema.parse(input))
-  .handler(async ({ data }) =>
-    scanMedicalReport(data.fileName, data.mimeType, data.base64Data, data.language),
-  );
+  .inputValidator((input: unknown) => parseScanReportInput(input))
+  .handler(async ({ data }): Promise<ScanReportResult> => {
+    try {
+      const report = await scanMedicalReport(
+        data.fileName,
+        data.mimeType,
+        data.base64Data,
+        data.language,
+      );
+      return { ok: true, report };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "The document could not be scanned.",
+      };
+    }
+  });

@@ -3,6 +3,7 @@ import { LANGUAGE_ENGLISH_NAMES } from "./i18n";
 const OCR_SPACE_URL = "https://api.ocr.space/parse/image";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-3.7-flash";
+const OCR_MAX_FILE_BYTES = 1_000_000;
 
 export type OcrReportSummary = {
   fileName: string;
@@ -16,6 +17,36 @@ type OcrSpaceResponse = {
   ParsedResults?: { ParsedText?: string }[];
 };
 
+export type ScanReportInput = {
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  language: string;
+};
+
+export function parseScanReportInput(input: unknown): ScanReportInput {
+  const value = input as Partial<ScanReportInput> | null;
+  return {
+    fileName: typeof value?.fileName === "string" ? value.fileName.slice(0, 200) : "report",
+    mimeType: typeof value?.mimeType === "string" ? value.mimeType.slice(0, 100) : "application/octet-stream",
+    base64Data: typeof value?.base64Data === "string" ? value.base64Data : "",
+    language: typeof value?.language === "string" && value.language ? value.language : "English",
+  };
+}
+
+function estimateBase64Bytes(base64Data: string) {
+  const clean = base64Data.replace(/\s/g, "");
+  const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+}
+
+function base64ToBlob(base64Data: string, mimeType: string) {
+  const binary = atob(base64Data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType || "application/octet-stream" });
+}
+
 async function extractTextWithOcrSpace(
   fileName: string,
   mimeType: string,
@@ -23,10 +54,18 @@ async function extractTextWithOcrSpace(
 ): Promise<string> {
   const apiKey = process.env["OCR_SPACE_API_KEY"];
   if (!apiKey) throw new Error("OCR is not configured yet. Please contact the front desk.");
+  if (!base64Data) throw new Error("The selected report file is empty. Please choose another file.");
+
+  const fileBytes = estimateBase64Bytes(base64Data);
+  if (fileBytes > OCR_MAX_FILE_BYTES) {
+    throw new Error(
+      "That report is too large for scanning. Please upload a compressed PDF or one clear JPG/PNG page under 1 MB.",
+    );
+  }
 
   const form = new FormData();
   form.append("apikey", apiKey);
-  form.append("base64Image", `data:${mimeType};base64,${base64Data}`);
+  form.append("file", base64ToBlob(base64Data, mimeType), fileName);
   form.append("filetype", mimeType === "application/pdf" ? "PDF" : "AUTO");
   form.append("isOverlayRequired", "false");
   form.append("detectOrientation", "true");
@@ -35,6 +74,11 @@ async function extractTextWithOcrSpace(
 
   const res = await fetch(OCR_SPACE_URL, { method: "POST", body: form });
   if (!res.ok) {
+    if (res.status === 413) {
+      throw new Error(
+        "That report is too large for scanning. Please upload a compressed PDF or one clear JPG/PNG page under 1 MB.",
+      );
+    }
     throw new Error(`Document scanning service unavailable (${res.status}). Please try again.`);
   }
   const data = (await res.json()) as OcrSpaceResponse;

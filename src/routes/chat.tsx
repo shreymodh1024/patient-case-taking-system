@@ -44,6 +44,9 @@ export const Route = createFileRoute("/chat")({
 });
 
 const KEYS = Object.keys(SOCRATES_LABELS) as SocratesKey[];
+const OCR_MAX_IMAGE_BYTES = 900_000;
+const OCR_MAX_DOCUMENT_BYTES = 1_000_000;
+const OCR_MAX_IMAGE_EDGE = 1800;
 
 const EMERGENCY_PHRASES: Record<string, string[]> = {
   English: [
@@ -85,6 +88,90 @@ function isEmergencyMessage(text: string, language: string) {
     phrases.some((phrase) => normalized.includes(phrase.toLocaleLowerCase())) ||
     englishPhrases.some((phrase) => normalized.includes(phrase))
   );
+}
+
+function replaceExtension(fileName: string, extension: string) {
+  return fileName.replace(/\.[^.]+$/, "") + extension;
+}
+
+function readBlobAsDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read the file."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Please upload a readable JPG, PNG, or WEBP report image."));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not prepare the image."))),
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+async function prepareImageForOcr(file: File) {
+  const image = await loadImage(file);
+  const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+  const scale = Math.min(1, OCR_MAX_IMAGE_EDGE / Math.max(1, longestSide));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not prepare the image.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+
+  let output = await canvasToBlob(canvas, 0.82);
+  for (const quality of [0.74, 0.66, 0.58, 0.5]) {
+    if (output.size <= OCR_MAX_IMAGE_BYTES) break;
+    output = await canvasToBlob(canvas, quality);
+  }
+  if (output.size > OCR_MAX_IMAGE_BYTES) {
+    throw new Error("That image is too large for scanning. Please upload one clearer report page at a time.");
+  }
+  return {
+    blob: output,
+    fileName: replaceExtension(file.name, ".jpg"),
+    mimeType: "image/jpeg",
+  };
+}
+
+async function prepareFileForOcr(file: File) {
+  if (!file.size) throw new Error("The selected report file is empty. Please choose another file.");
+  const mimeType = file.type || "application/octet-stream";
+  if (mimeType.startsWith("image/")) return prepareImageForOcr(file);
+  if (mimeType === "application/pdf" || file.name.toLocaleLowerCase().endsWith(".pdf")) {
+    if (file.size > OCR_MAX_DOCUMENT_BYTES) {
+      throw new Error(
+        "That PDF is too large for scanning. Please upload a compressed PDF under 1 MB or one report page as an image.",
+      );
+    }
+    return { blob: file, fileName: file.name, mimeType: "application/pdf" };
+  }
+  throw new Error("Please upload a PDF or report image file, such as JPG, PNG, WEBP, or HEIC.");
 }
 
 function ChatScreen() {
@@ -184,22 +271,26 @@ function ChatScreen() {
     setError(null);
     setUploading(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Could not read the file."));
-        reader.readAsDataURL(file);
-      });
+      const prepared = await prepareFileForOcr(file);
+      const dataUrl = await readBlobAsDataUrl(prepared.blob);
       const base64Data = dataUrl.split(",")[1] ?? "";
-      const mimeType = file.type || "application/octet-stream";
       const result = await scanReport({
-        data: { fileName: file.name, mimeType, base64Data, language: state.language },
+        data: {
+          fileName: prepared.fileName,
+          mimeType: prepared.mimeType,
+          base64Data,
+          language: state.language,
+        },
       });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       setKioskState({
         extracted: {
-          fileName: result.fileName,
-          fields: result.fields,
-          ocrSummary: result.summaryText,
+          fileName: result.report.fileName,
+          fields: result.report.fields,
+          ocrSummary: result.report.summaryText,
         },
       });
     } catch (e) {
@@ -317,7 +408,7 @@ function ChatScreen() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,image/jpeg,image/png,image/webp,image/heic,image/*"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
