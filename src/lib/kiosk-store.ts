@@ -142,11 +142,4 @@ export function effectiveMessages(state: KioskState): ChatMessage[] {
   return state.messages;
 }
 
-export const MOCK_EXTRACTION: ExtractedDoc = {
-  fileName: "Prescription_March2026.pdf",
-  fields: [
-    { label: "Diagnosis", value: "Hypertension" },
-    { label: "Medication", value: "Amlodipine 5mg" },
-    { label: "Last visit", value: "March 2026" },
-  ],
-};
+
