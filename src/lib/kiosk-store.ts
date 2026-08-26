@@ -13,6 +13,8 @@ export type ExtractedDoc = {
   fileName: string;
   fields: { label: string; value: string }[];
   ocrSummary?: string;
+  /** Index in the effective message list after which the card is rendered. */
+  messageIndex?: number;
 };
 
 export type SocratesKey =

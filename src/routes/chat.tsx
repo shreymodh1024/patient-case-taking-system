@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   FileText,
   Loader as Loader2,
@@ -286,13 +286,14 @@ function ChatScreen() {
         setError(result.error);
         return;
       }
-      setKioskState({
+      setKioskState((s) => ({
         extracted: {
           fileName: result.report.fileName,
           fields: result.report.fields,
           ocrSummary: result.report.summaryText,
+          messageIndex: effectiveMessages(s).length - 1,
         },
-      });
+      }));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.genericError);
     } finally {
@@ -334,31 +335,60 @@ function ChatScreen() {
             ref={scrollRef}
             className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 sm:gap-8 sm:p-6"
           >
-            {messages.map((m, i) =>
-              m.role === "assistant" ? (
-                <div key={i} className="flex max-w-[80%] flex-col gap-2">
-                  <div className="rounded-2xl rounded-tl-none bg-zinc-100 p-4">
-                    <p className="text-pretty text-base leading-relaxed text-zinc-800">
-                      {m.content}
-                    </p>
+            {messages.map((m, i) => (
+              <Fragment key={i}>
+                {m.role === "assistant" ? (
+                  <div className="flex max-w-[80%] flex-col gap-2">
+                    <div className="rounded-2xl rounded-tl-none bg-zinc-100 p-4">
+                      <p className="text-pretty text-base leading-relaxed text-zinc-800">
+                        {m.content}
+                      </p>
+                    </div>
+                    <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
+                      AI{m.time ? ` • ${m.time}` : ""}
+                    </span>
                   </div>
-                  <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
-                    AI{m.time ? ` • ${m.time}` : ""}
-                  </span>
-                </div>
-              ) : (
-                <div key={i} className="flex max-w-[80%] flex-col items-end gap-2 self-end">
-                  <div className="rounded-2xl rounded-tr-none bg-clinical-teal p-4">
-                    <p className="text-pretty text-sm leading-relaxed text-primary-foreground">
-                      {m.content}
-                    </p>
+                ) : (
+                  <div className="flex max-w-[80%] flex-col items-end gap-2 self-end">
+                    <div className="rounded-2xl rounded-tr-none bg-clinical-teal p-4">
+                      <p className="text-pretty text-sm leading-relaxed text-primary-foreground">
+                        {m.content}
+                      </p>
+                    </div>
+                    <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
+                      You • {m.time}
+                    </span>
                   </div>
-                  <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
-                    You • {m.time}
-                  </span>
-                </div>
-              ),
-            )}
+                )}
+                {state.extracted && i === state.extracted.messageIndex && (
+                  <div className="flex flex-col gap-4 rounded-2xl border border-clinical-blue/10 bg-clinical-blue/5 p-5">
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-lg bg-clinical-blue/10 p-2">
+                        <FileText className="size-4 text-clinical-blue" strokeWidth={1.5} />
+                      </span>
+                      <span className="text-sm font-semibold text-clinical-blue">
+                        {state.extracted.fileName} · {t.extractionComplete}
+                      </span>
+                    </div>
+                    {state.extracted.ocrSummary && (
+                      <p className="text-pretty text-sm leading-relaxed text-zinc-700">
+                        {state.extracted.ocrSummary}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      {state.extracted.fields.map((f) => (
+                        <div key={f.label} className="space-y-1">
+                          <p className="text-[10px] font-medium uppercase text-zinc-400">
+                            {f.label}
+                          </p>
+                          <p className="text-xs text-zinc-700">{f.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Fragment>
+            ))}
 
             {busy && (
               <div className="flex items-center gap-2 text-xs text-zinc-400">
@@ -373,7 +403,8 @@ function ChatScreen() {
               </div>
             )}
 
-            {state.extracted && (
+            {/* Fallback for sessions saved before messageIndex existed */}
+            {state.extracted && state.extracted.messageIndex == null && (
               <div className="flex flex-col gap-4 rounded-2xl border border-clinical-blue/10 bg-clinical-blue/5 p-5">
                 <div className="flex items-center gap-3">
                   <span className="rounded-lg bg-clinical-blue/10 p-2">
@@ -388,14 +419,6 @@ function ChatScreen() {
                     {state.extracted.ocrSummary}
                   </p>
                 )}
-                <div className="grid grid-cols-2 gap-4">
-                  {state.extracted.fields.map((f) => (
-                    <div key={f.label} className="space-y-1">
-                      <p className="text-[10px] font-medium uppercase text-zinc-400">{f.label}</p>
-                      <p className="text-xs text-zinc-700">{f.value}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
