@@ -403,7 +403,8 @@ function ChatScreen() {
               </div>
             )}
 
-            {state.extracted && (
+            {/* Fallback for sessions saved before messageIndex existed */}
+            {state.extracted && state.extracted.messageIndex == null && (
               <div className="flex flex-col gap-4 rounded-2xl border border-clinical-blue/10 bg-clinical-blue/5 p-5">
                 <div className="flex items-center gap-3">
                   <span className="rounded-lg bg-clinical-blue/10 p-2">
@@ -418,14 +419,6 @@ function ChatScreen() {
                     {state.extracted.ocrSummary}
                   </p>
                 )}
-                <div className="grid grid-cols-2 gap-4">
-                  {state.extracted.fields.map((f) => (
-                    <div key={f.label} className="space-y-1">
-                      <p className="text-[10px] font-medium uppercase text-zinc-400">{f.label}</p>
-                      <p className="text-xs text-zinc-700">{f.value}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
