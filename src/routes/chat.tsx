@@ -286,13 +286,14 @@ function ChatScreen() {
         setError(result.error);
         return;
       }
-      setKioskState({
+      setKioskState((s) => ({
         extracted: {
           fileName: result.report.fileName,
           fields: result.report.fields,
           ocrSummary: result.report.summaryText,
+          messageIndex: effectiveMessages(s).length - 1,
         },
-      });
+      }));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.genericError);
     } finally {
