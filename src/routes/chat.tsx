@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
 import { intakeTurn } from "@/lib/intake.functions";
+import { scanReport } from "@/lib/ocr.functions";
 import {
-  MOCK_EXTRACTION,
   SOCRATES_LABELS,
   nowLabel,
   setKioskState,
