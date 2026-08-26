@@ -180,21 +180,29 @@ function SummaryScreen() {
                 {t.extractedData}
               </h2>
               {state.extracted ? (
-                <div className="space-y-2">
-                  {state.extracted.fields.map((f, index) => (
-                    <div key={f.label} className="flex items-center justify-between gap-4 text-sm">
-                      <span className="font-medium text-zinc-500">{f.label}</span>
-                      {editing ? (
-                        <input
-                          value={f.value}
-                          onChange={(e) => updateDocumentField(index, e.target.value)}
-                          className="min-h-11 w-2/3 rounded-lg bg-white px-3 text-right text-sm text-zinc-900 outline-none ring-1 ring-zinc-950/10 focus:ring-clinical-teal"
-                        />
-                      ) : (
-                        <span className="text-right text-zinc-900">{f.value}</span>
-                      )}
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-clinical-blue">{state.extracted.fileName}</p>
+                  {state.extracted.ocrSummary && (
+                    <p className="text-pretty text-sm leading-relaxed text-zinc-700">
+                      {state.extracted.ocrSummary}
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    {state.extracted.fields.map((f, index) => (
+                      <div key={f.label} className="flex items-center justify-between gap-4 text-sm">
+                        <span className="font-medium text-zinc-500">{f.label}</span>
+                        {editing ? (
+                          <input
+                            value={f.value}
+                            onChange={(e) => updateDocumentField(index, e.target.value)}
+                            className="min-h-11 w-2/3 rounded-lg bg-white px-3 text-right text-sm text-zinc-900 outline-none ring-1 ring-zinc-950/10 focus:ring-clinical-teal"
+                          />
+                        ) : (
+                          <span className="text-right text-zinc-900">{f.value}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-zinc-500">{t.noDocuments}</p>

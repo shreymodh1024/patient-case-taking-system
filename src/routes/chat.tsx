@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   FileText,
   Loader as Loader2,
@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
 import { intakeTurn } from "@/lib/intake.functions";
+import { scanReport } from "@/lib/ocr.functions";
 import {
-  MOCK_EXTRACTION,
   SOCRATES_LABELS,
   nowLabel,
   setKioskState,
@@ -44,6 +44,9 @@ export const Route = createFileRoute("/chat")({
 });
 
 const KEYS = Object.keys(SOCRATES_LABELS) as SocratesKey[];
+const OCR_MAX_IMAGE_BYTES = 900_000;
+const OCR_MAX_DOCUMENT_BYTES = 1_000_000;
+const OCR_MAX_IMAGE_EDGE = 1800;
 
 const EMERGENCY_PHRASES: Record<string, string[]> = {
   English: [
@@ -87,6 +90,90 @@ function isEmergencyMessage(text: string, language: string) {
   );
 }
 
+function replaceExtension(fileName: string, extension: string) {
+  return fileName.replace(/\.[^.]+$/, "") + extension;
+}
+
+function readBlobAsDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read the file."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Please upload a readable JPG, PNG, or WEBP report image."));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not prepare the image."))),
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+async function prepareImageForOcr(file: File) {
+  const image = await loadImage(file);
+  const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+  const scale = Math.min(1, OCR_MAX_IMAGE_EDGE / Math.max(1, longestSide));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not prepare the image.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+
+  let output = await canvasToBlob(canvas, 0.82);
+  for (const quality of [0.74, 0.66, 0.58, 0.5]) {
+    if (output.size <= OCR_MAX_IMAGE_BYTES) break;
+    output = await canvasToBlob(canvas, quality);
+  }
+  if (output.size > OCR_MAX_IMAGE_BYTES) {
+    throw new Error("That image is too large for scanning. Please upload one clearer report page at a time.");
+  }
+  return {
+    blob: output,
+    fileName: replaceExtension(file.name, ".jpg"),
+    mimeType: "image/jpeg",
+  };
+}
+
+async function prepareFileForOcr(file: File) {
+  if (!file.size) throw new Error("The selected report file is empty. Please choose another file.");
+  const mimeType = file.type || "application/octet-stream";
+  if (mimeType.startsWith("image/")) return prepareImageForOcr(file);
+  if (mimeType === "application/pdf" || file.name.toLocaleLowerCase().endsWith(".pdf")) {
+    if (file.size > OCR_MAX_DOCUMENT_BYTES) {
+      throw new Error(
+        "That PDF is too large for scanning. Please upload a compressed PDF under 1 MB or one report page as an image.",
+      );
+    }
+    return { blob: file, fileName: file.name, mimeType: "application/pdf" };
+  }
+  throw new Error("Please upload a PDF or report image file, such as JPG, PNG, WEBP, or HEIC.");
+}
+
 function ChatScreen() {
   const state = useKiosk();
   const t = useT();
@@ -97,6 +184,7 @@ function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const baseDraftRef = useRef("");
 
   const speech = useSpeechRecognition({
@@ -146,7 +234,7 @@ function ChatScreen() {
           language: state.language,
           ayushMode: state.ayushMode,
           extractedNote: state.extracted
-            ? `${state.extracted.fileName}: ${state.extracted.fields
+            ? `${state.extracted.fileName}: ${state.extracted.ocrSummary ?? ""} ${state.extracted.fields
                 .map((f) => `${f.label} ${f.value}`)
                 .join(", ")}`
             : null,
@@ -176,11 +264,42 @@ function ChatScreen() {
 
   const upload = () => {
     if (uploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFile = async (file: File) => {
+    setError(null);
     setUploading(true);
-    window.setTimeout(() => {
-      setKioskState({ extracted: MOCK_EXTRACTION });
+    try {
+      const prepared = await prepareFileForOcr(file);
+      const dataUrl = await readBlobAsDataUrl(prepared.blob);
+      const base64Data = dataUrl.split(",")[1] ?? "";
+      const result = await scanReport({
+        data: {
+          fileName: prepared.fileName,
+          mimeType: prepared.mimeType,
+          base64Data,
+          language: state.language,
+        },
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setKioskState((s) => ({
+        extracted: {
+          fileName: result.report.fileName,
+          fields: result.report.fields,
+          ocrSummary: result.report.summaryText,
+          messageIndex: effectiveMessages(s).length - 1,
+        },
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t.genericError);
+    } finally {
       setUploading(false);
-    }, 1400);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const capturedCount = state.captured.length;
@@ -216,31 +335,60 @@ function ChatScreen() {
             ref={scrollRef}
             className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 sm:gap-8 sm:p-6"
           >
-            {messages.map((m, i) =>
-              m.role === "assistant" ? (
-                <div key={i} className="flex max-w-[80%] flex-col gap-2">
-                  <div className="rounded-2xl rounded-tl-none bg-zinc-100 p-4">
-                    <p className="text-pretty text-base leading-relaxed text-zinc-800">
-                      {m.content}
-                    </p>
+            {messages.map((m, i) => (
+              <Fragment key={i}>
+                {m.role === "assistant" ? (
+                  <div className="flex max-w-[80%] flex-col gap-2">
+                    <div className="rounded-2xl rounded-tl-none bg-zinc-100 p-4">
+                      <p className="text-pretty text-base leading-relaxed text-zinc-800">
+                        {m.content}
+                      </p>
+                    </div>
+                    <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
+                      AI{m.time ? ` • ${m.time}` : ""}
+                    </span>
                   </div>
-                  <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
-                    AI{m.time ? ` • ${m.time}` : ""}
-                  </span>
-                </div>
-              ) : (
-                <div key={i} className="flex max-w-[80%] flex-col items-end gap-2 self-end">
-                  <div className="rounded-2xl rounded-tr-none bg-clinical-teal p-4">
-                    <p className="text-pretty text-sm leading-relaxed text-primary-foreground">
-                      {m.content}
-                    </p>
+                ) : (
+                  <div className="flex max-w-[80%] flex-col items-end gap-2 self-end">
+                    <div className="rounded-2xl rounded-tr-none bg-clinical-teal p-4">
+                      <p className="text-pretty text-sm leading-relaxed text-primary-foreground">
+                        {m.content}
+                      </p>
+                    </div>
+                    <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
+                      You • {m.time}
+                    </span>
                   </div>
-                  <span className="px-1 text-[10px] font-medium uppercase text-zinc-400">
-                    You • {m.time}
-                  </span>
-                </div>
-              ),
-            )}
+                )}
+                {state.extracted && i === state.extracted.messageIndex && (
+                  <div className="flex flex-col gap-4 rounded-2xl border border-clinical-blue/10 bg-clinical-blue/5 p-5">
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-lg bg-clinical-blue/10 p-2">
+                        <FileText className="size-4 text-clinical-blue" strokeWidth={1.5} />
+                      </span>
+                      <span className="text-sm font-semibold text-clinical-blue">
+                        {state.extracted.fileName} · {t.extractionComplete}
+                      </span>
+                    </div>
+                    {state.extracted.ocrSummary && (
+                      <p className="text-pretty text-sm leading-relaxed text-zinc-700">
+                        {state.extracted.ocrSummary}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      {state.extracted.fields.map((f) => (
+                        <div key={f.label} className="space-y-1">
+                          <p className="text-[10px] font-medium uppercase text-zinc-400">
+                            {f.label}
+                          </p>
+                          <p className="text-xs text-zinc-700">{f.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Fragment>
+            ))}
 
             {busy && (
               <div className="flex items-center gap-2 text-xs text-zinc-400">
@@ -255,7 +403,8 @@ function ChatScreen() {
               </div>
             )}
 
-            {state.extracted && (
+            {/* Fallback for sessions saved before messageIndex existed */}
+            {state.extracted && state.extracted.messageIndex == null && (
               <div className="flex flex-col gap-4 rounded-2xl border border-clinical-blue/10 bg-clinical-blue/5 p-5">
                 <div className="flex items-center gap-3">
                   <span className="rounded-lg bg-clinical-blue/10 p-2">
@@ -265,14 +414,11 @@ function ChatScreen() {
                     {state.extracted.fileName} · {t.extractionComplete}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {state.extracted.fields.map((f) => (
-                    <div key={f.label} className="space-y-1">
-                      <p className="text-[10px] font-medium uppercase text-zinc-400">{f.label}</p>
-                      <p className="text-xs text-zinc-700">{f.value}</p>
-                    </div>
-                  ))}
-                </div>
+                {state.extracted.ocrSummary && (
+                  <p className="text-pretty text-sm leading-relaxed text-zinc-700">
+                    {state.extracted.ocrSummary}
+                  </p>
+                )}
               </div>
             )}
 
@@ -282,6 +428,16 @@ function ChatScreen() {
           </div>
 
           <footer className="border-t border-zinc-950/5 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleFile(file);
+              }}
+            />
             <div className="flex items-center gap-1 rounded-xl bg-zinc-50 p-1.5 ring-1 ring-zinc-950/10 sm:gap-2 sm:p-2">
               <button
                 onClick={upload}
