@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SPEECH_LOCALES } from "./use-speech-recognition";
-import { speakText } from "./tts.functions";
-import { chunkText } from "./tts-chunk";
 
 
 
@@ -48,68 +46,63 @@ export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported
   },
 };
 
+function pickVoice(locale: string) {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const lower = locale.toLowerCase();
+  const base = lower.split("-")[0]!;
+  return (
+    voices.find((v) => v.lang.toLowerCase() === lower) ??
+    voices.find((v) => v.lang.toLowerCase().replace("_", "-").startsWith(base)) ??
+    null
+  );
+}
+
 export function useSpeechSynthesis(language: string) {
   const [enabled, setEnabled] = useState(true);
   const [speaking, setSpeaking] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const runIdRef = useRef(0);
+  const [supported, setSupported] = useState(false);
+  const voicesReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    setSupported(true);
+    const load = () => {
+      voicesReadyRef.current = window.speechSynthesis.getVoices().length > 0;
+    };
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, []);
 
   const cancel = useCallback(() => {
-    runIdRef.current += 1;
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.src = "";
-      audioRef.current = null;
-    }
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
     setSpeaking(false);
   }, []);
 
   useEffect(() => cancel, [cancel]);
 
-  const playClip = (base64: string, runId: number) =>
-    new Promise<void>((resolve) => {
-      if (runIdRef.current !== runId) return resolve();
-      const audio = new Audio(`data:audio/wav;base64,${base64}`);
-      audioRef.current = audio;
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      void audio.play().catch(() => resolve());
-    });
-
   const speak = useCallback(
-    async (text: string) => {
+    (text: string) => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
       if (!text.trim()) return;
-      cancel();
-      const runId = runIdRef.current;
-      setSpeaking(true);
-      const languageCode = SPEECH_LOCALES[language] ?? "en-IN";
-      try {
-        // Fire every chunk request at once so the first clip starts as soon as
-        // it is ready, while the rest generate in parallel.
-        const pending = chunkText(text).map((chunk) =>
-          speakText({ data: { text: chunk, languageCode } }).catch(
-            () => ({ ok: false as const, error: "failed" }),
-          ),
-        );
-        for (const request of pending) {
-          const result = await request;
-          if (runIdRef.current !== runId) return;
-          if (!result.ok) continue;
-          for (const clip of result.audios) {
-            if (runIdRef.current !== runId) return;
-            await playClip(clip, runId);
-          }
-        }
-      } catch {
-        // Voice playback is non-critical; stay silent on failure.
-      } finally {
-        if (runIdRef.current === runId) setSpeaking(false);
-      }
+      window.speechSynthesis.cancel();
+      const locale = SPEECH_LOCALES[language] ?? "en-IN";
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = locale;
+      const voice = pickVoice(locale);
+      if (voice) utterance.voice = voice;
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => setSpeaking(true);
+      utterance.onend = () => setSpeaking(false);
+      utterance.onerror = () => setSpeaking(false);
+      // Chrome sometimes ignores the first call before voices load.
+      window.speechSynthesis.speak(utterance);
     },
-    [cancel, language],
+    [language],
   );
-
 
   const toggleEnabled = useCallback(() => {
     setEnabled((prev) => {
@@ -118,6 +111,7 @@ export function useSpeechSynthesis(language: string) {
     });
   }, [cancel]);
 
-  return { supported: true, enabled, speaking, speak, cancel, toggleEnabled };
+  return { supported, enabled, speaking, speak, cancel, toggleEnabled };
 }
+
 
