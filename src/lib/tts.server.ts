@@ -50,8 +50,8 @@ export async function synthesizeSpeech(
       body: JSON.stringify({
         text: chunk,
         target_language_code: languageCode,
-        speaker: "anushka",
-        model: "bulbul:v2",
+        speaker: "priya",
+        model: "bulbul:v3",
         pace: 1,
         enable_preprocessing: true,
       }),
