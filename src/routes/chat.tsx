@@ -10,8 +10,11 @@ import {
   AlertTriangle,
   Mic,
   MicOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
+import { useSpeechSynthesis, VOICE_LABELS } from "@/lib/use-speech-synthesis";
 import { intakeTurn } from "@/lib/intake.functions";
 import { scanReport } from "@/lib/ocr.functions";
 import {
@@ -200,15 +203,37 @@ function ChatScreen() {
   const speechLabels = SPEECH_LABELS[state.language] ?? SPEECH_LABELS["English"]!;
 
   const toggleVoice = () => {
-    if (!speech.listening) baseDraftRef.current = draft;
+    if (!speech.listening) {
+      baseDraftRef.current = draft;
+      window.speechSynthesis?.cancel();
+    }
     speech.toggle();
   };
+
+  const tts = useSpeechSynthesis(state.language);
+  const voiceLabels = VOICE_LABELS[state.language] ?? VOICE_LABELS["English"]!;
+  const spokenRef = useRef<string | null>(null);
 
   const messages = effectiveMessages(state);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, state.extracted, busy]);
+
+  // Read each new assistant reply aloud with the browser's speech synthesis.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    const id = `${messages.length}:${last.content}`;
+    if (spokenRef.current === id) return;
+    spokenRef.current = id;
+    if (tts.supported && tts.enabled) tts.speak(last.content);
+  }, [messages, tts]);
+
+  useEffect(() => {
+    if (!tts.enabled) tts.cancel();
+  }, [tts.enabled, tts]);
+
 
   const submit = async () => {
     const text = draft.trim();
@@ -318,16 +343,36 @@ function ChatScreen() {
                 <p className="truncate text-xs text-zinc-500">{t.assistantSubtitle}</p>
               </div>
             </div>
-            <div className="flex shrink-0 gap-1">
-              {KEYS.map((k) => (
-                <span
-                  key={k}
-                  title={SOCRATES_LABELS[k]}
-                  className={`h-1.5 w-3 rounded-full sm:w-6 ${
-                    state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
-                  }`}
-                />
-              ))}
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={tts.toggleEnabled}
+                disabled={!tts.supported}
+                title={tts.supported ? undefined : voiceLabels.unsupported}
+                aria-label={tts.enabled ? voiceLabels.on : voiceLabels.off}
+                aria-pressed={tts.enabled}
+                className={`flex size-9 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${
+                  tts.enabled && tts.supported
+                    ? "bg-clinical-teal/10 text-clinical-teal"
+                    : "text-zinc-400 hover:bg-zinc-100"
+                } ${tts.speaking ? "animate-pulse" : ""}`}
+              >
+                {tts.enabled && tts.supported ? (
+                  <Volume2 className="size-4" strokeWidth={1.5} />
+                ) : (
+                  <VolumeX className="size-4" strokeWidth={1.5} />
+                )}
+              </button>
+              <div className="flex gap-1">
+                {KEYS.map((k) => (
+                  <span
+                    key={k}
+                    title={SOCRATES_LABELS[k]}
+                    className={`h-1.5 w-3 rounded-full sm:w-6 ${
+                      state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </header>
 
