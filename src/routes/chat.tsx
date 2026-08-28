@@ -203,7 +203,10 @@ function ChatScreen() {
   const speechLabels = SPEECH_LABELS[state.language] ?? SPEECH_LABELS["English"]!;
 
   const toggleVoice = () => {
-    if (!speech.listening) baseDraftRef.current = draft;
+    if (!speech.listening) {
+      baseDraftRef.current = draft;
+      window.speechSynthesis?.cancel();
+    }
     speech.toggle();
   };
 
