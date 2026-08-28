@@ -331,10 +331,55 @@ function ChatScreen() {
   const capturedCount = state.captured.length;
 
   return (
-    <main className="min-h-screen bg-zinc-100 px-3 py-6 sm:px-6 sm:py-12 md:py-20">
-      <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        <div className="flex h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-[20px] bg-white shadow-sm ring-1 ring-zinc-950/5 sm:h-[700px] sm:rounded-[24px]">
-          <header className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-zinc-950/5 bg-white px-4 py-3 sm:flex sm:justify-between sm:px-6 sm:py-4">
+    <main className="h-[100dvh] w-screen overflow-hidden bg-zinc-100">
+      <div className="grid h-full w-full grid-cols-[64px_1fr] sm:grid-cols-[80px_1fr] lg:grid-cols-[96px_1fr]">
+        {/* Left action rail — mic, upload, send */}
+        <aside className="flex flex-col items-center gap-6 bg-white px-2 py-4 shadow-sm ring-1 ring-zinc-950/5 sm:py-8">
+          <button
+            onClick={toggleVoice}
+            disabled={!speech.supported}
+            title={speech.supported ? undefined : speechLabels.unsupported}
+            aria-label={speech.listening ? speechLabels.stop : speechLabels.start}
+            aria-pressed={speech.listening}
+            className={`flex size-12 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 sm:size-14 ${
+              speech.listening
+                ? "animate-pulse bg-red-500 text-white"
+                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900"
+            }`}
+          >
+            {speech.supported ? (
+              <Mic className="size-5 sm:size-6" strokeWidth={1.5} />
+            ) : (
+              <MicOff className="size-5 sm:size-6" strokeWidth={1.5} />
+            )}
+          </button>
+
+          <button
+            onClick={upload}
+            disabled={uploading}
+            aria-label={t.uploadLabel}
+            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 hover:text-zinc-900 disabled:opacity-60 sm:size-14"
+          >
+            {uploading ? (
+              <Loader2 className="size-5 animate-spin sm:size-6" strokeWidth={1.5} />
+            ) : (
+              <Plus className="size-5 sm:size-6" strokeWidth={1.5} />
+            )}
+          </button>
+
+          <button
+            onClick={() => void submit()}
+            disabled={busy || !draft.trim()}
+            aria-label={t.sendLabel}
+            className="flex size-12 shrink-0 items-center justify-center rounded-full bg-clinical-teal text-primary-foreground transition-colors hover:bg-clinical-teal/90 disabled:opacity-40 sm:size-14"
+          >
+            <Send className="size-5 sm:size-6" strokeWidth={1.5} />
+          </button>
+        </aside>
+
+        {/* Main chat area */}
+        <div className="flex min-w-0 flex-col overflow-hidden bg-white">
+          <header className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-zinc-950/5 bg-white px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-clinical-teal/10 font-medium text-clinical-teal">
                 AI
@@ -344,7 +389,7 @@ function ChatScreen() {
                 <p className="truncate text-xs text-zinc-500">{t.assistantSubtitle}</p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <button
                 onClick={tts.toggleEnabled}
                 disabled={!tts.supported}
@@ -363,16 +408,21 @@ function ChatScreen() {
                   <VolumeX className="size-4" strokeWidth={1.5} />
                 )}
               </button>
-              <div className="flex gap-1">
-                {KEYS.map((k) => (
-                  <span
-                    key={k}
-                    title={SOCRATES_LABELS[k]}
-                    className={`h-1.5 w-3 rounded-full sm:w-6 ${
-                      state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
-                    }`}
-                  />
-                ))}
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  {KEYS.map((k) => (
+                    <span
+                      key={k}
+                      title={SOCRATES_LABELS[k]}
+                      className={`h-1.5 w-3 rounded-full sm:w-4 ${
+                        state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="hidden text-xs text-zinc-500 sm:inline">
+                  {t.markers(capturedCount)}
+                </span>
               </div>
             </div>
           </header>
@@ -473,7 +523,7 @@ function ChatScreen() {
             )}
           </div>
 
-          <footer className="border-t border-zinc-950/5 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+          <footer className="border-t border-zinc-950/5 bg-white p-3 sm:p-4">
             <input
               ref={fileInputRef}
               type="file"
@@ -484,89 +534,41 @@ function ChatScreen() {
                 if (file) void handleFile(file);
               }}
             />
-            <div className="flex items-center gap-1 rounded-xl bg-zinc-50 p-1.5 ring-1 ring-zinc-950/10 sm:gap-2 sm:p-2">
-              <button
-                onClick={upload}
-                aria-label={t.uploadLabel}
-                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 p-2 text-zinc-500 transition-colors hover:text-zinc-700"
+
+            {state.priorityAlert && (
+              <div
+                role="alert"
+                className="mb-3 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 shadow-sm"
               >
-                {uploading ? (
-                  <Loader2 className="size-5 animate-spin" strokeWidth={1.5} />
-                ) : (
-                  <Plus className="size-5 shrink-0" strokeWidth={1.5} />
-                )}
-                <span className="hidden text-xs font-medium sm:inline">
-                  {uploading ? t.extractingDocument : t.uploadDocument}
-                </span>
-              </button>
-              <input
-                value={draft}
-                onChange={(e) => {
-                  setDraft(e.target.value);
-                  baseDraftRef.current = e.target.value;
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void submit();
-                }}
-                type="text"
-                placeholder={t.inputPlaceholder}
-                className="min-h-11 w-full min-w-0 flex-1 border-none bg-transparent px-1 py-2 text-base outline-none placeholder:text-zinc-400"
-              />
+                <AlertTriangle className="size-5 shrink-0 text-red-600" strokeWidth={2} />
+                <span>{t.priorityAlert}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
+              <div className="flex min-h-12 sm:min-h-14 items-center rounded-full bg-zinc-50 px-4 ring-1 ring-zinc-950/10">
+                <input
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    baseDraftRef.current = e.target.value;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void submit();
+                  }}
+                  type="text"
+                  placeholder={t.inputPlaceholder}
+                  className="min-h-12 sm:min-h-14 w-full min-w-0 bg-transparent text-base outline-none placeholder:text-zinc-400"
+                />
+              </div>
               <button
-                onClick={toggleVoice}
-                disabled={!speech.supported}
-                title={speech.supported ? undefined : speechLabels.unsupported}
-                aria-label={speech.listening ? speechLabels.stop : speechLabels.start}
-                aria-pressed={speech.listening}
-                className={`min-h-11 min-w-11 shrink-0 rounded-lg p-2 transition-colors disabled:opacity-40 ${
-                  speech.listening
-                    ? "animate-pulse bg-red-500 text-white"
-                    : "text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
-                }`}
+                onClick={() => navigate({ to: "/summary" })}
+                className="flex min-h-12 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-950/5 sm:px-5 sm:text-base"
               >
-                {speech.supported ? (
-                  <Mic className="mx-auto size-5" strokeWidth={1.5} />
-                ) : (
-                  <MicOff className="mx-auto size-5" strokeWidth={1.5} />
-                )}
-              </button>
-              <button
-                onClick={() => void submit()}
-                disabled={busy || !draft.trim()}
-                aria-label={t.sendLabel}
-                className="min-h-11 min-w-11 shrink-0 rounded-lg bg-clinical-teal p-2 text-primary-foreground disabled:opacity-40"
-              >
-                <Send className="mx-auto size-4" strokeWidth={1.5} />
+                {t.viewSummary} <ArrowRight className="size-4" strokeWidth={1.5} />
               </button>
             </div>
-            {(speech.listening || speech.error) && (
-              <p
-                className={`px-2 pt-2 text-xs ${speech.error ? "text-destructive" : "text-zinc-500"}`}
-              >
-                {speech.error ?? speechLabels.stop}
-              </p>
-            )}
           </footer>
-        </div>
-
-        {state.priorityAlert && (
-          <div
-            role="alert"
-            className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-semibold text-red-800 shadow-sm"
-          >
-            <AlertTriangle className="size-5 shrink-0 text-red-600" strokeWidth={2} />
-            <span>{t.priorityAlert}</span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between px-2">
-          <p className="text-xs text-zinc-500">{t.markers(capturedCount)}</p>
-          <button
-            onClick={() => navigate({ to: "/summary" })}
-            className="flex min-h-12 items-center gap-2 rounded-lg bg-white px-4 text-base font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-950/5"
-          >
-            {t.viewSummary} <ArrowRight className="size-4" strokeWidth={1.5} />
-          </button>
         </div>
       </div>
     </main>
