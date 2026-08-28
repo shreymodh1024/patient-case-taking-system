@@ -10,8 +10,11 @@ import {
   AlertTriangle,
   Mic,
   MicOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useSpeechRecognition, SPEECH_LABELS } from "@/lib/use-speech-recognition";
+import { useSpeechSynthesis, VOICE_LABELS } from "@/lib/use-speech-synthesis";
 import { intakeTurn } from "@/lib/intake.functions";
 import { scanReport } from "@/lib/ocr.functions";
 import {
