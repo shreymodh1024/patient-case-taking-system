@@ -362,15 +362,17 @@ function ChatScreen() {
                   <VolumeX className="size-4" strokeWidth={1.5} />
                 )}
               </button>
-              {KEYS.map((k) => (
-                <span
-                  key={k}
-                  title={SOCRATES_LABELS[k]}
-                  className={`h-1.5 w-3 rounded-full sm:w-6 ${
-                    state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
-                  }`}
-                />
-              ))}
+              <div className="flex gap-1">
+                {KEYS.map((k) => (
+                  <span
+                    key={k}
+                    title={SOCRATES_LABELS[k]}
+                    className={`h-1.5 w-3 rounded-full sm:w-6 ${
+                      state.captured.includes(k) ? "bg-clinical-teal" : "bg-zinc-200"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </header>
 
