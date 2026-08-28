@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SPEECH_LOCALES } from "./use-speech-recognition";
 import { speakText } from "./tts.functions";
+import { chunkText } from "./tts-chunk";
+
 
 
 export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported: string }> = {
@@ -81,14 +83,23 @@ export function useSpeechSynthesis(language: string) {
       cancel();
       const runId = runIdRef.current;
       setSpeaking(true);
+      const languageCode = SPEECH_LOCALES[language] ?? "en-IN";
       try {
-        const result = await speakText({
-          data: { text, languageCode: SPEECH_LOCALES[language] ?? "en-IN" },
-        });
-        if (runIdRef.current !== runId || !result.ok) return;
-        for (const clip of result.audios) {
+        // Fire every chunk request at once so the first clip starts as soon as
+        // it is ready, while the rest generate in parallel.
+        const pending = chunkText(text).map((chunk) =>
+          speakText({ data: { text: chunk, languageCode } }).catch(
+            () => ({ ok: false as const, error: "failed" }),
+          ),
+        );
+        for (const request of pending) {
+          const result = await request;
           if (runIdRef.current !== runId) return;
-          await playClip(clip, runId);
+          if (!result.ok) continue;
+          for (const clip of result.audios) {
+            if (runIdRef.current !== runId) return;
+            await playClip(clip, runId);
+          }
         }
       } catch {
         // Voice playback is non-critical; stay silent on failure.
@@ -98,6 +109,7 @@ export function useSpeechSynthesis(language: string) {
     },
     [cancel, language],
   );
+
 
   const toggleEnabled = useCallback(() => {
     setEnabled((prev) => {
