@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SPEECH_LOCALES } from "./use-speech-recognition";
+import { speakText } from "./tts.functions";
+
 
 export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported: string }> = {
   English: {
@@ -44,75 +46,66 @@ export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported
   },
 };
 
-function getSynth(): SpeechSynthesis | null {
-  if (typeof window === "undefined") return null;
-  return window.speechSynthesis ?? null;
-}
-
-function pickVoice(synth: SpeechSynthesis, locale: string) {
-  const voices = synth.getVoices();
-  if (!voices.length) return null;
-  const lang = locale.toLowerCase();
-  const base = lang.split("-")[0]!;
-  return (
-    voices.find((v) => v.lang.toLowerCase() === lang) ??
-    voices.find((v) => v.lang.toLowerCase().startsWith(base)) ??
-    null
-  );
-}
-
 export function useSpeechSynthesis(language: string) {
-  const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [speaking, setSpeaking] = useState(false);
-  const voicesReady = useRef(false);
-
-  useEffect(() => {
-    const synth = getSynth();
-    if (!synth) return;
-    setSupported(true);
-    const load = () => {
-      voicesReady.current = synth.getVoices().length > 0;
-    };
-    load();
-    synth.addEventListener?.("voiceschanged", load);
-    return () => {
-      synth.removeEventListener?.("voiceschanged", load);
-      synth.cancel();
-    };
-  }, []);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const runIdRef = useRef(0);
 
   const cancel = useCallback(() => {
-    getSynth()?.cancel();
+    runIdRef.current += 1;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.src = "";
+      audioRef.current = null;
+    }
     setSpeaking(false);
   }, []);
 
+  useEffect(() => cancel, [cancel]);
+
+  const playClip = (base64: string, runId: number) =>
+    new Promise<void>((resolve) => {
+      if (runIdRef.current !== runId) return resolve();
+      const audio = new Audio(`data:audio/wav;base64,${base64}`);
+      audioRef.current = audio;
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      void audio.play().catch(() => resolve());
+    });
+
   const speak = useCallback(
-    (text: string) => {
-      const synth = getSynth();
-      if (!synth || !text.trim()) return;
-      synth.cancel();
-      const locale = SPEECH_LOCALES[language] ?? "en-IN";
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = locale;
-      const voice = pickVoice(synth, locale);
-      if (voice) utterance.voice = voice;
-      utterance.rate = 0.98;
-      utterance.pitch = 1;
-      utterance.onstart = () => setSpeaking(true);
-      utterance.onend = () => setSpeaking(false);
-      utterance.onerror = () => setSpeaking(false);
-      synth.speak(utterance);
+    async (text: string) => {
+      if (!text.trim()) return;
+      cancel();
+      const runId = runIdRef.current;
+      setSpeaking(true);
+      try {
+        const result = await speakText({
+          data: { text, languageCode: SPEECH_LOCALES[language] ?? "en-IN" },
+        });
+        if (runIdRef.current !== runId || !result.ok) return;
+        for (const clip of result.audios) {
+          if (runIdRef.current !== runId) return;
+          await playClip(clip, runId);
+        }
+      } catch {
+        // Voice playback is non-critical; stay silent on failure.
+      } finally {
+        if (runIdRef.current === runId) setSpeaking(false);
+      }
     },
-    [language],
+    [cancel, language],
   );
 
   const toggleEnabled = useCallback(() => {
     setEnabled((prev) => {
-      if (prev) getSynth()?.cancel();
+      if (prev) cancel();
       return !prev;
     });
-  }, []);
+  }, [cancel]);
 
-  return { supported, enabled, speaking, speak, cancel, toggleEnabled };
+  return { supported: true, enabled, speaking, speak, cancel, toggleEnabled };
 }
+
