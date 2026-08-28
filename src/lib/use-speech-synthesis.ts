@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SPEECH_LOCALES } from "./use-speech-recognition";
+import { speakText } from "./tts.functions";
+
 
 export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported: string }> = {
   English: {
