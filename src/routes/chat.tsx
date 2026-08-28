@@ -153,7 +153,9 @@ async function prepareImageForOcr(file: File) {
     output = await canvasToBlob(canvas, quality);
   }
   if (output.size > OCR_MAX_IMAGE_BYTES) {
-    throw new Error("That image is too large for scanning. Please upload one clearer report page at a time.");
+    throw new Error(
+      "That image is too large for scanning. Please upload one clearer report page at a time.",
+    );
   }
   return {
     blob: output,
@@ -210,7 +212,6 @@ function ChatScreen() {
     speech.toggle();
   };
 
-
   const tts = useSpeechSynthesis(state.language);
   const voiceLabels = VOICE_LABELS[state.language] ?? VOICE_LABELS["English"]!;
   const spokenRef = useRef<string | null>(null);
@@ -225,16 +226,16 @@ function ChatScreen() {
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant") return;
+    if (!tts.supported || !tts.enabled) return;
     const id = `${messages.length}:${last.content}`;
     if (spokenRef.current === id) return;
     spokenRef.current = id;
-    if (tts.supported && tts.enabled) tts.speak(last.content);
+    tts.speak(last.content);
   }, [messages, tts]);
 
   useEffect(() => {
     if (!tts.enabled) tts.cancel();
   }, [tts.enabled, tts]);
-
 
   const submit = async () => {
     const text = draft.trim();
