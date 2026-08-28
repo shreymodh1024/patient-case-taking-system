@@ -343,7 +343,25 @@ function ChatScreen() {
                 <p className="truncate text-xs text-zinc-500">{t.assistantSubtitle}</p>
               </div>
             </div>
-            <div className="flex shrink-0 gap-1">
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={tts.toggleEnabled}
+                disabled={!tts.supported}
+                title={tts.supported ? undefined : voiceLabels.unsupported}
+                aria-label={tts.enabled ? voiceLabels.on : voiceLabels.off}
+                aria-pressed={tts.enabled}
+                className={`flex size-9 items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${
+                  tts.enabled && tts.supported
+                    ? "bg-clinical-teal/10 text-clinical-teal"
+                    : "text-zinc-400 hover:bg-zinc-100"
+                } ${tts.speaking ? "animate-pulse" : ""}`}
+              >
+                {tts.enabled && tts.supported ? (
+                  <Volume2 className="size-4" strokeWidth={1.5} />
+                ) : (
+                  <VolumeX className="size-4" strokeWidth={1.5} />
+                )}
+              </button>
               {KEYS.map((k) => (
                 <span
                   key={k}
