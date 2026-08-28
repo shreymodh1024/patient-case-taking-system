@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SPEECH_LOCALES } from "./use-speech-recognition";
-import { speakText } from "./tts.functions";
-import { chunkText } from "./tts-chunk";
 
 
 
