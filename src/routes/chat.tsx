@@ -207,11 +207,30 @@ function ChatScreen() {
     speech.toggle();
   };
 
+  const tts = useSpeechSynthesis(state.language);
+  const voiceLabels = VOICE_LABELS[state.language] ?? VOICE_LABELS["English"]!;
+  const spokenRef = useRef<string | null>(null);
+
   const messages = effectiveMessages(state);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, state.extracted, busy]);
+
+  // Read each new assistant reply aloud with the browser's speech synthesis.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    const id = `${messages.length}:${last.content}`;
+    if (spokenRef.current === id) return;
+    spokenRef.current = id;
+    if (tts.supported && tts.enabled) tts.speak(last.content);
+  }, [messages, tts]);
+
+  useEffect(() => {
+    if (!tts.enabled) tts.cancel();
+  }, [tts.enabled, tts]);
+
 
   const submit = async () => {
     const text = draft.trim();
