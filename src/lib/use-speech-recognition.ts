@@ -58,12 +58,14 @@ type RecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives?: number;
   start: () => void;
   stop: () => void;
   abort: () => void;
   onresult: ((e: any) => void) | null;
   onerror: ((e: any) => void) | null;
   onend: (() => void) | null;
+  onstart: (() => void) | null;
 };
 
 function getCtor(): (new () => RecognitionLike) | null {
@@ -81,31 +83,53 @@ export function useSpeechRecognition(options: {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<RecognitionLike | null>(null);
+  const wantRef = useRef(false);
   const cbRef = useRef(onTranscript);
   cbRef.current = onTranscript;
+  const langRef = useRef(language);
+  langRef.current = language;
 
   useEffect(() => {
     setSupported(getCtor() !== null);
-    return () => ref.current?.abort();
+    return () => {
+      wantRef.current = false;
+      try {
+        ref.current?.abort();
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
 
   const stop = useCallback(() => {
-    ref.current?.stop();
+    wantRef.current = false;
+    try {
+      ref.current?.stop();
+    } catch {
+      /* ignore */
+    }
     setListening(false);
   }, []);
 
-  const start = useCallback(() => {
+  const launch = useCallback(() => {
     const Ctor = getCtor();
-    if (!Ctor) {
-      setError(SPEECH_LABELS[language]?.unsupported ?? SPEECH_LABELS["English"]!.unsupported);
-      return;
+    if (!Ctor) return;
+    try {
+      ref.current?.abort();
+    } catch {
+      /* ignore */
     }
-    setError(null);
-    ref.current?.abort();
     const rec = new Ctor();
-    rec.lang = SPEECH_LOCALES[language] ?? "en-IN";
-    rec.continuous = false;
+    rec.lang = SPEECH_LOCALES[langRef.current] ?? "en-IN";
+    // Continuous keeps the session alive between pauses so short silences
+    // don't silently end the capture.
+    rec.continuous = true;
     rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.onstart = () => {
+      setListening(true);
+      setError(null);
+    };
     rec.onresult = (e: any) => {
       let interim = "";
       let final = "";
@@ -120,23 +144,61 @@ export function useSpeechRecognition(options: {
     rec.onerror = (e: any) => {
       const code = e?.error;
       if (code === "no-speech" || code === "aborted") return;
+      wantRef.current = false;
+      setListening(false);
       setError(
         code === "not-allowed" || code === "service-not-allowed"
-          ? "Microphone permission was denied."
-          : "Voice input failed. Please try again.",
+          ? "Microphone permission was blocked. Allow mic access in your browser and try again."
+          : code === "network"
+            ? "Voice recognition needs an internet connection. Please retry."
+            : "Voice input failed. Please try again.",
       );
     };
-    rec.onend = () => setListening(false);
+    rec.onend = () => {
+      // Chrome ends the session on its own after a pause — restart while the
+      // user still has the mic toggled on.
+      if (wantRef.current) {
+        try {
+          rec.start();
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
+      setListening(false);
+    };
     ref.current = rec;
     try {
       rec.start();
-      setListening(true);
     } catch {
       setListening(false);
     }
-  }, [language]);
+  }, []);
 
-  const toggle = useCallback(() => (listening ? stop() : start()), [listening, start, stop]);
+  const start = useCallback(async () => {
+    if (!getCtor()) {
+      setError(SPEECH_LABELS[langRef.current]?.unsupported ?? SPEECH_LABELS["English"]!.unsupported);
+      return;
+    }
+    setError(null);
+    // Ask for mic permission up-front: inside embedded frames Chrome otherwise
+    // rejects the recognition session without a prompt.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      setError("Microphone permission was blocked. Allow mic access in your browser and try again.");
+      return;
+    }
+    wantRef.current = true;
+    launch();
+  }, [launch]);
+
+  const toggle = useCallback(() => {
+    if (listening || wantRef.current) stop();
+    else void start();
+  }, [listening, start, stop]);
 
   return { supported, listening, error, start, stop, toggle };
 }
+
