@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SPEECH_LOCALES } from "./use-speech-recognition";
-
-
-
 export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported: string }> = {
   English: {
     on: "Turn off voice replies",
@@ -46,8 +43,7 @@ export const VOICE_LABELS: Record<string, { on: string; off: string; unsupported
   },
 };
 
-function pickVoice(locale: string) {
-  const voices = window.speechSynthesis.getVoices();
+function pickVoice(locale: string, voices: SpeechSynthesisVoice[]) {
   if (!voices.length) return null;
   const lower = locale.toLowerCase();
   const base = lower.split("-")[0]!;
@@ -62,20 +58,68 @@ export function useSpeechSynthesis(language: string) {
   const [enabled, setEnabled] = useState(true);
   const [speaking, setSpeaking] = useState(false);
   const [supported, setSupported] = useState(false);
-  const voicesReadyRef = useRef(false);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const pendingTextRef = useRef<string | null>(null);
+  const retryTimerRef = useRef<number | null>(null);
+
+  const speakWithVoices = useCallback(
+    (text: string, voices: SpeechSynthesisVoice[]) => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+      window.speechSynthesis.cancel();
+      const locale = SPEECH_LOCALES[language] ?? "en-IN";
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voice = pickVoice(locale, voices);
+
+      utterance.lang = locale;
+      if (voice) {
+        utterance.voice = voice;
+      } else {
+        // Some browsers do not ship every Indian language voice. Using the
+        // default installed voice is preferable to dropping the reply.
+        const fallbackVoice = voices.find((item) => item.default) ?? voices[0];
+        if (fallbackVoice) {
+          utterance.voice = fallbackVoice;
+          utterance.lang = fallbackVoice.lang;
+        }
+      }
+
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => setSpeaking(true);
+      utterance.onend = () => setSpeaking(false);
+      utterance.onerror = () => setSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    },
+    [language],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     setSupported(true);
     const load = () => {
-      voicesReadyRef.current = window.speechSynthesis.getVoices().length > 0;
+      const voices = window.speechSynthesis.getVoices();
+      voicesRef.current = voices;
+      const pendingText = pendingTextRef.current;
+      if (voices.length && pendingText) {
+        pendingTextRef.current = null;
+        speakWithVoices(pendingText, voices);
+      }
     };
     load();
     window.speechSynthesis.addEventListener("voiceschanged", load);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
-  }, []);
+    return () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", load);
+      if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
+    };
+  }, [speakWithVoices]);
 
   const cancel = useCallback(() => {
+    pendingTextRef.current = null;
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
     setSpeaking(false);
@@ -87,21 +131,31 @@ export function useSpeechSynthesis(language: string) {
     (text: string) => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
       if (!text.trim()) return;
-      window.speechSynthesis.cancel();
-      const locale = SPEECH_LOCALES[language] ?? "en-IN";
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = locale;
-      const voice = pickVoice(locale);
-      if (voice) utterance.voice = voice;
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      utterance.onstart = () => setSpeaking(true);
-      utterance.onend = () => setSpeaking(false);
-      utterance.onerror = () => setSpeaking(false);
-      // Chrome sometimes ignores the first call before voices load.
-      window.speechSynthesis.speak(utterance);
+      const voices = window.speechSynthesis.getVoices();
+      voicesRef.current = voices;
+      if (voices.length) {
+        pendingTextRef.current = null;
+        speakWithVoices(text, voices);
+        return;
+      }
+
+      // getVoices() can briefly return an empty list on first render.
+      // Keep the reply pending for voiceschanged, with a delayed fallback
+      // for browsers that never emit that event.
+      pendingTextRef.current = text;
+      if (retryTimerRef.current === null) {
+        retryTimerRef.current = window.setTimeout(() => {
+          retryTimerRef.current = null;
+          const pendingText = pendingTextRef.current;
+          if (!pendingText) return;
+          const latestVoices = window.speechSynthesis.getVoices();
+          voicesRef.current = latestVoices;
+          pendingTextRef.current = null;
+          speakWithVoices(pendingText, latestVoices);
+        }, 1200);
+      }
     },
-    [language],
+    [speakWithVoices],
   );
 
   const toggleEnabled = useCallback(() => {
@@ -113,5 +167,3 @@ export function useSpeechSynthesis(language: string) {
 
   return { supported, enabled, speaking, speak, cancel, toggleEnabled };
 }
-
-
