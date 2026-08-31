@@ -32,6 +32,10 @@ function SummaryScreen() {
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveCase = useServerFn(savePatientCase);
+
 
   const summary = state.summary ?? {
     chiefComplaint: t.awaitingComplaint,
