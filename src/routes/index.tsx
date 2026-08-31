@@ -29,7 +29,11 @@ function WelcomeScreen() {
   const t = useT();
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [idInput, setIdInput] = useState("");
+  const patientId = /^\d+$/.test(idInput) ? Number(idInput) : null;
   const navigate = useNavigate();
+
 
   const startScan = () => {
     if (!consented || scanning) return;
