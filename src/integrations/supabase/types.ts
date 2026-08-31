@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      patient_cases: {
+        Row: {
+          ayush_responses: string[]
+          chief_complaint: string | null
+          created_at: string
+          extracted: Json | null
+          hpi: string | null
+          id: string
+          language: string | null
+          past_medical_history: string[]
+          patient_id: number
+          socrates_tags: string[]
+        }
+        Insert: {
+          ayush_responses?: string[]
+          chief_complaint?: string | null
+          created_at?: string
+          extracted?: Json | null
+          hpi?: string | null
+          id?: string
+          language?: string | null
+          past_medical_history?: string[]
+          patient_id: number
+          socrates_tags?: string[]
+        }
+        Update: {
+          ayush_responses?: string[]
+          chief_complaint?: string | null
+          created_at?: string
+          extracted?: Json | null
+          hpi?: string | null
+          id?: string
+          language?: string | null
+          past_medical_history?: string[]
+          patient_id?: number
+          socrates_tags?: string[]
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
