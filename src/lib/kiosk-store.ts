@@ -50,6 +50,7 @@ export type KioskState = {
   language: string;
   consented: boolean;
   abhaId: string | null;
+  patientId: number | null;
   messages: ChatMessage[];
   captured: SocratesKey[];
   extracted: ExtractedDoc | null;
@@ -65,6 +66,7 @@ export const initialState: KioskState = {
   language: "English",
   consented: false,
   abhaId: null,
+  patientId: null,
   messages: [],
   captured: [],
   extracted: null,
@@ -73,6 +75,7 @@ export const initialState: KioskState = {
   priorityAlert: false,
   ayushMode: false,
 };
+
 
 export function nowLabel() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
