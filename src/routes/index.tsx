@@ -123,23 +123,74 @@ function WelcomeScreen() {
               <span className="h-px flex-1 bg-zinc-950/5" />
             </div>
 
-            <button
-              onClick={() => {
-                if (!consented) return;
-                resetKiosk();
-                setKioskState({
-                  language,
-                  consented: true,
-                  ayushMode,
-                  abhaId: "Manual entry",
-                });
-                navigate({ to: "/chat" });
-              }}
-              disabled={!consented}
-              className="min-h-14 w-full rounded-xl py-4 text-base font-medium text-clinical-teal transition-colors hover:bg-clinical-teal/5 disabled:opacity-50"
-            >
-              {t.manualEntry}
-            </button>
+            {!manualOpen ? (
+              <button
+                onClick={() => {
+                  if (!consented) return;
+                  setManualOpen(true);
+                }}
+                disabled={!consented}
+                className="min-h-14 w-full rounded-xl py-4 text-base font-medium text-clinical-teal transition-colors hover:bg-clinical-teal/5 disabled:opacity-50"
+              >
+                {t.manualEntry}
+              </button>
+            ) : (
+              <div className="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-950/5">
+                <label
+                  htmlFor="abha-id"
+                  className="mb-2 block text-sm font-medium text-zinc-700"
+                >
+                  Enter your ABHA ID number
+                </label>
+                <input
+                  id="abha-id"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={idInput}
+                  onChange={(e) => setIdInput(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                  placeholder="e.g. 88291022"
+                  className="min-h-12 w-full rounded-lg bg-white px-3 text-base text-zinc-900 outline-none ring-1 ring-zinc-950/10 focus:ring-clinical-teal"
+                />
+                {patientId === null && (
+                  <p className="mt-2 text-sm text-zinc-500">
+                    Numbers only. Your past summaries are stored against this ID.
+                  </p>
+                )}
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <button
+                    onClick={() => {
+                      if (patientId === null) return;
+                      resetKiosk();
+                      setKioskState({
+                        language,
+                        consented: true,
+                        ayushMode,
+                        patientId,
+                        abhaId: `ABHA-${patientId}`,
+                      });
+                      navigate({ to: "/chat" });
+                    }}
+                    disabled={patientId === null}
+                    className="min-h-14 rounded-xl bg-clinical-teal px-4 text-base font-medium text-primary-foreground shadow-sm transition-opacity disabled:opacity-40"
+                  >
+                    New Case Entry
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (patientId === null) return;
+                      setKioskState({ patientId, abhaId: `ABHA-${patientId}` });
+                      navigate({ to: "/history", search: { id: patientId } });
+                    }}
+                    disabled={patientId === null}
+                    className="min-h-14 rounded-xl bg-white px-4 text-base font-medium text-zinc-900 ring-1 ring-zinc-950/10 transition-opacity disabled:opacity-40"
+                  >
+                    See Old Medical History
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
