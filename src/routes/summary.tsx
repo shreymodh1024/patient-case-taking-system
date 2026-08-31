@@ -227,16 +227,59 @@ function SummaryScreen() {
                 {t.defer}
               </button>
               <button
-                onClick={() => {
-                  setKioskState({ confirmed: true });
-                  setSuccess(true);
-                  window.setTimeout(() => setSuccess(false), 3200);
+                disabled={saving}
+                onClick={async () => {
+                  setSaveError(null);
+                  if (state.patientId === null) {
+                    setKioskState({ confirmed: true });
+                    setSuccess(true);
+                    setSaveError("No patient ID — record not stored in the database.");
+                    window.setTimeout(() => setSuccess(false), 3200);
+                    return;
+                  }
+                  setSaving(true);
+                  try {
+                    const res = await saveCase({
+                      data: {
+                        patientId: state.patientId,
+                        language: state.language,
+                        chiefComplaint: summary.chiefComplaint,
+                        hpi: summary.hpi,
+                        pastMedicalHistory: summary.pastMedicalHistory,
+                        socratesTags: summary.socratesTags,
+                        ayushResponses,
+                        extracted: state.extracted
+                          ? {
+                              fileName: state.extracted.fileName,
+                              ocrSummary: state.extracted.ocrSummary,
+                              fields: state.extracted.fields,
+                            }
+                          : null,
+                      },
+                    });
+                    if (!res.ok) {
+                      setSaveError("Could not store the record. Please try again.");
+                      return;
+                    }
+                    setKioskState({ confirmed: true });
+                    setSuccess(true);
+                    window.setTimeout(() => setSuccess(false), 3200);
+                  } catch {
+                    setSaveError("Could not store the record. Please try again.");
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
-                className="flex min-h-12 items-center gap-2 rounded-lg bg-clinical-teal py-2 pl-2 pr-3 text-base font-medium text-primary-foreground shadow-sm ring-1 ring-clinical-teal"
+                className="flex min-h-12 items-center gap-2 rounded-lg bg-clinical-teal py-2 pl-2 pr-3 text-base font-medium text-primary-foreground shadow-sm ring-1 ring-clinical-teal disabled:opacity-60"
               >
-                <Check className="size-4 shrink-0" strokeWidth={1.5} />
+                {saving ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" strokeWidth={1.5} />
+                ) : (
+                  <Check className="size-4 shrink-0" strokeWidth={1.5} />
+                )}
                 {state.confirmed ? t.confirmed : t.confirmPush}
               </button>
+
             </div>
           </div>
           {success && (
