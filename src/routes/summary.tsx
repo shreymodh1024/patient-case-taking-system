@@ -1,8 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Check, Pencil, CalendarDays } from "lucide-react";
+import { Check, Pencil, CalendarDays, Loader as Loader2 } from "lucide-react";
 import { setKioskState, useKiosk } from "@/lib/kiosk-store";
+import { savePatientCase } from "@/lib/cases.functions";
 import { useT } from "@/lib/i18n";
+
 
 export const Route = createFileRoute("/summary")({
   head: () => ({
