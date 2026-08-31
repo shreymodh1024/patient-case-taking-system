@@ -297,6 +297,15 @@ function SummaryScreen() {
               {t.hisSuccess}
             </div>
           )}
+          {saveError && (
+            <div
+              role="alert"
+              className="border-t border-red-200 bg-red-50 px-6 py-4 text-sm font-medium text-red-700"
+            >
+              {saveError}
+            </div>
+          )}
+
         </div>
       </div>
     </main>
