@@ -12,9 +12,9 @@ export type SavedCase = {
   socratesTags: string[];
   ayushResponses: string[];
   extracted: {
-    fileName?: string;
-    ocrSummary?: string;
-    fields?: { label: string; value: string }[];
+    fileName?: string | undefined;
+    ocrSummary?: string | undefined;
+    fields?: { label: string; value: string }[] | undefined;
   } | null;
 };
 
