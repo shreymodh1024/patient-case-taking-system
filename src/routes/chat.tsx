@@ -519,8 +519,10 @@ function ChatScreen() {
               </div>
             )}
 
-            {error && (
-              <p className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">{error}</p>
+            {(error || speech.error) && (
+              <p className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
+                {error ?? speech.error}
+              </p>
             )}
           </div>
 
